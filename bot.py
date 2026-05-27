@@ -74,6 +74,7 @@ menu = ReplyKeyboardMarkup(
             KeyboardButton(text="✍️ Своя тема")
         ],
         [
+            KeyboardButton(text="👥 Рефералы"),
             KeyboardButton(text="💎 PRO")
         ]
     ],
@@ -90,11 +91,54 @@ async def start(message: Message):
     user_id = str(message.from_user.id)
 
     if user_id not in users:
+
+        referrer_id = None
+
+        args = message.text.split()
+
+        if len(args) > 1:
+            referrer_id = args[1]
+
         users[user_id] = {
-            "requests": 50
+            "requests": 50,
+            "invited": 0
         }
 
+        if referrer_id and referrer_id != user_id:
+
+            if referrer_id in users:
+
+                users[referrer_id]["invited"] += 1
+
+                if referrer_id not in pro_users:
+
+                    pro_users[referrer_id] = {
+                        "until": (
+                            datetime.now() + timedelta(days=7)
+                        ).strftime("%Y-%m-%d")
+                    }
+
+                save_json(PRO_FILE, pro_users)
+
         save_json(USERS_FILE, users)
+
+    # ===== AUTO REMOVE EXPIRED PRO =====
+
+    if user_id in pro_users:
+
+        pro_data = pro_users[user_id]
+
+        if "until" in pro_data:
+
+            expire_date = datetime.strptime(
+                pro_data["until"],
+                "%Y-%m-%d"
+            )
+
+            if datetime.now() > expire_date:
+
+                del pro_users[user_id]
+                save_json(PRO_FILE, pro_users)
 
     pro_status = "✅ Да" if user_id in pro_users else "❌ Нет"
 
@@ -142,11 +186,13 @@ async def buttons(message: Message):
     user_id = str(message.from_user.id)
 
     if user_id not in users:
+
         users[user_id] = {
-            "requests": 50
+            "requests": 50,
+            "invited": 0
         }
 
-    # ========= PRO =========
+    # ================= PRO =================
 
     if message.text == "💎 PRO":
 
@@ -169,61 +215,96 @@ async def buttons(message: Message):
 
         await message.answer(
             """
-💎 PRO скоро будет доступен
+💎 PRO подписка
 
 • Без лимитов
 • Быстрые ответы
-• Premium hooks
+• Premium Hooks
 • Viral сценарии
+• Лучшие идеи для TikTok
 """,
             reply_markup=keyboard
         )
 
         return
 
-    # ========= LIMIT =========
+    # ================= REF =================
+
+    if message.text == "👥 Рефералы":
+
+        bot_info = await bot.get_me()
+
+        ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
+
+        invited = users[user_id].get("invited", 0)
+
+        await message.answer(
+            f"""
+👥 Реферальная система
+
+Твоя ссылка:
+{ref_link}
+
+Приглашено друзей:
+{invited}
+
+🎁 За каждого друга:
++7 дней PRO
+"""
+        )
+
+        return
+
+    # ================= LIMIT =================
 
     if user_id not in pro_users:
 
         if users[user_id]["requests"] <= 0:
+
             await message.answer(
                 "❌ Лимит закончился.\nКупи 💎 PRO"
             )
+
             return
 
         users[user_id]["requests"] -= 1
+
         save_json(USERS_FILE, users)
 
-    await message.answer("⏳ Генерирую вирусный контент...")
+    await message.answer(
+        "⏳ Генерирую вирусный контент..."
+    )
 
     try:
 
-        # ========= IDEA =========
+        # ================= IDEA =================
 
         if message.text == "🎬 Идея ролика":
 
             prompt = """
 Придумай вирусную идею TikTok ролика.
-Кратко и красиво.
+Сделай коротко и очень интересно.
 """
 
-        # ========= HOOK =========
+        # ================= HOOK =================
 
         elif message.text == "🔥 Hook":
 
             prompt = """
-Придумай 5 мощных TikTok Hook для вирусного видео.
+Придумай 5 мощных TikTok Hook
+для вирусного видео.
 """
 
-        # ========= TAGS =========
+        # ================= TAGS =================
 
         elif message.text == "📈 Хештеги":
 
             prompt = """
-Придумай вирусные TikTok хештеги.
+Придумай вирусные TikTok хештеги
+для больших просмотров.
 """
 
-        # ========= CUSTOM =========
+        # ================= CUSTOM =================
 
         else:
 
