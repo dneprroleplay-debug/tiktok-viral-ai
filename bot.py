@@ -9,7 +9,7 @@ from aiogram.types import (
     CallbackQuery
 )
 
-from openai import OpenAI
+from groq import Groq
 import asyncio
 import json
 import os
@@ -23,9 +23,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_ID = 805924502
 
-client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
+client = Groq(
+    api_key=os.getenv("GROQ_API_KEY")
 )
 
 # =========================
