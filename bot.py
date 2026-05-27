@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # TOKENS
 # =========================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8854279157:AAGny_hfazw7DXKn9jo8-oARpIng6uXSuhc"
 
 ADMIN_ID = 805924502
 
