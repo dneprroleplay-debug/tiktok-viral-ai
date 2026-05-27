@@ -24,7 +24,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 805924502
 
 client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
+    api_key=os.environ["GROQ_API_KEY"]
 )
 
 # =========================
