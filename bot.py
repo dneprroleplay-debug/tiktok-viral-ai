@@ -99,10 +99,9 @@ async def start(message: Message):
         if len(args) > 1:
             referrer_id = args[1]
 
-        users[user_id] = {
-            "requests": 50,
-            "invited": 0
-        }
+users[user_id] = {
+    "requests": 50
+}
 
         if referrer_id and referrer_id != user_id:
 
