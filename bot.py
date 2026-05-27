@@ -22,12 +22,12 @@ from datetime import datetime, timedelta
 # TOKENS
 # =========================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8854279157:AAGny_hfazw7DXKn9jo8-oARpIng6uXSuhc"
 
 ADMIN_ID = 805924502
 
 client = Groq(
-    api_key=os.getenv("GROQ_API_KEY")
+    api_key="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"
 )
 
 # =========================
