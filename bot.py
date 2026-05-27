@@ -1,5 +1,4 @@
-```python
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.types import (
     Message,
@@ -10,7 +9,7 @@ from aiogram.types import (
     CallbackQuery
 )
 
-from openai import OpenAI
+from groq import Groq
 
 import asyncio
 import json
@@ -27,9 +26,8 @@ BOT_TOKEN = "8854279157:AAGny_hfazw7DXKn9jo8-oARpIng6uXSuhc"
 
 ADMIN_ID = 805924502
 
-client = OpenAI(
-    api_key="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",
-    base_url="https://api.groq.com/openai/v1"
+client = Groq(
+    api_key="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"
 )
 
 # =========================
@@ -49,57 +47,46 @@ busy_users = {}
 waiting_custom_topic = set()
 
 # =========================
-# LOAD JSON
+# CREATE FILES
 # =========================
 
-def load_json(path, default):
-
-    if os.path.exists(path):
-
-        try:
-
-            with open(path, "r", encoding="utf-8") as file:
-                return json.load(file)
-
-        except:
-            return default
-
-    return default
+for file_name, default_data in [
+    (USERS_FILE, {}),
+    (PRO_FILE, {}),
+    (REF_FILE, {})
+]:
+    if not os.path.exists(file_name):
+        with open(file_name, "w", encoding="utf-8") as f:
+            json.dump(default_data, f)
 
 # =========================
-# SAVE JSON
+# LOAD
 # =========================
 
-def save_json(path, data):
+with open(USERS_FILE, "r", encoding="utf-8") as f:
+    user_limits = json.load(f)
 
-    with open(path, "w", encoding="utf-8") as file:
-        json.dump(
-            data,
-            file,
-            ensure_ascii=False,
-            indent=4
-        )
+with open(PRO_FILE, "r", encoding="utf-8") as f:
+    pro_users = json.load(f)
 
-# =========================
-# DATABASES
-# =========================
-
-user_limits = load_json(USERS_FILE, {})
-pro_users = load_json(PRO_FILE, {})
-referrals = load_json(REF_FILE, {})
+with open(REF_FILE, "r", encoding="utf-8") as f:
+    referrals = json.load(f)
 
 # =========================
-# SAVE FUNCTIONS
+# SAVE
 # =========================
 
 def save_users():
-    save_json(USERS_FILE, user_limits)
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(user_limits, f, ensure_ascii=False, indent=4)
 
 def save_pro():
-    save_json(PRO_FILE, pro_users)
+    with open(PRO_FILE, "w", encoding="utf-8") as f:
+        json.dump(pro_users, f, ensure_ascii=False, indent=4)
 
 def save_refs():
-    save_json(REF_FILE, referrals)
+    with open(REF_FILE, "w", encoding="utf-8") as f:
+        json.dump(referrals, f, ensure_ascii=False, indent=4)
 
 # =========================
 # PRO CHECK
@@ -112,14 +99,13 @@ def is_pro(user_id):
     if user_id not in pro_users:
         return False
 
-    pro_data = pro_users[user_id]
+    data = pro_users[user_id]
 
-    if pro_data == "forever":
+    if data == "forever":
         return True
 
     try:
-
-        end_date = datetime.fromisoformat(pro_data)
+        end_date = datetime.fromisoformat(data)
 
         if datetime.now() < end_date:
             return True
@@ -143,14 +129,13 @@ def get_pro_status(user_id):
     if user_id not in pro_users:
         return "❌ Нет"
 
-    pro_data = pro_users[user_id]
+    data = pro_users[user_id]
 
-    if pro_data == "forever":
+    if data == "forever":
         return "👑 Навсегда"
 
     try:
-
-        end_date = datetime.fromisoformat(pro_data)
+        end_date = datetime.fromisoformat(data)
 
         return f"💎 До {end_date.strftime('%d.%m.%Y')}"
 
@@ -189,72 +174,8 @@ async def start(message: Message):
     user_id = str(message.from_user.id)
 
     if user_id not in user_limits:
-
         user_limits[user_id] = 0
         save_users()
-
-    # =========================
-    # REFERRALS
-    # =========================
-
-    args = message.text.split()
-
-    if len(args) > 1:
-
-        ref_id = args[1]
-
-        if ref_id != user_id:
-
-            if user_id not in referrals:
-
-                referrals[user_id] = ref_id
-
-                if ref_id:
-
-                    if ref_id in pro_users:
-
-                        current_pro = pro_users[ref_id]
-
-                        if current_pro != "forever":
-
-                            try:
-
-                                current_date = datetime.fromisoformat(current_pro)
-
-                                if datetime.now() > current_date:
-                                    current_date = datetime.now()
-
-                            except:
-                                current_date = datetime.now()
-
-                            new_date = current_date + timedelta(days=7)
-
-                            pro_users[ref_id] = new_date.isoformat()
-
-                    else:
-
-                        new_date = datetime.now() + timedelta(days=7)
-
-                        pro_users[ref_id] = new_date.isoformat()
-
-                    save_pro()
-
-                save_refs()
-
-                try:
-
-                    await bot.send_message(
-                        ref_id,
-                        """
-🎉 Ты пригласил друга!
-
-💎 Бонус:
-+7 ДНЕЙ PRO
-"""
-                    )
-
-                except:
-                    pass
 
     pro_status = get_pro_status(user_id)
 
@@ -286,9 +207,9 @@ async def callbacks(callback: CallbackQuery):
 
         await callback.message.answer(
             f"""
-💎 PRO 30 ДНЕЙ — $5
+💎 PRO 30 ДНЕЙ — $4.99
 
-🆔 Твой ID:
+🆔 ID:
 {user_id}
 
 Напиши админу:
@@ -300,9 +221,9 @@ async def callbacks(callback: CallbackQuery):
 
         await callback.message.answer(
             f"""
-👑 PRO НАВСЕГДА — $15
+👑 PRO НАВСЕГДА — $14.99
 
-🆔 Твой ID:
+🆔 ID:
 {user_id}
 
 Напиши админу:
@@ -313,7 +234,7 @@ async def callbacks(callback: CallbackQuery):
     await callback.answer()
 
 # =========================
-# MAIN HANDLER
+# MAIN
 # =========================
 
 @dp.message()
@@ -322,31 +243,49 @@ async def generate(message: Message):
     user_id = str(message.from_user.id)
     current_text = message.text
 
-    if user_id not in user_limits:
+    # =========================
+    # ADMIN
+    # =========================
 
-        user_limits[user_id] = 0
-        save_users()
+    if message.from_user.id == ADMIN_ID:
 
-    pro_status = is_pro(user_id)
+        if current_text == "/stats":
+
+            await message.answer(
+                f"""
+📊 СТАТИСТИКА
+
+👥 Юзеров:
+{len(user_limits)}
+
+💎 PRO:
+{len(pro_users)}
+
+🔗 Рефералов:
+{len(referrals)}
+"""
+            )
+
+            return
 
     # =========================
-    # REFERRALS
+    # REF
     # =========================
 
     if current_text == "👥 Рефералы":
 
         bot_info = await bot.get_me()
 
-        ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
+        link = f"https://t.me/{bot_info.username}?start={user_id}"
 
         await message.answer(
             f"""
-👥 ТВОЯ РЕФЕРАЛЬНАЯ ССЫЛКА
+👥 ТВОЯ ССЫЛКА
 
-🔗 {ref_link}
+{link}
 
-🎁 За каждого друга:
-+7 ДНЕЙ PRO
+🎁 За друга:
++7 дней PRO
 """
         )
 
@@ -358,52 +297,39 @@ async def generate(message: Message):
 
     if current_text == "💎 PRO":
 
-        if pro_status:
-
-            await message.answer(
-                f"""
-💎 У тебя уже есть PRO
-
-{get_pro_status(user_id)}
-"""
-            )
-
-        else:
-
-            pro_menu = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="💎 PRO 30 ДНЕЙ — $5",
-                            callback_data="buy_30"
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text="👑 PRO НАВСЕГДА — $15",
-                            callback_data="buy_forever"
-                        )
-                    ]
+        pro_menu = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💎 PRO 30 ДНЕЙ",
+                        callback_data="buy_30"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="👑 PRO НАВСЕГДА",
+                        callback_data="buy_forever"
+                    )
                 ]
-            )
+            ]
+        )
 
-            await message.answer(
-                """
+        await message.answer(
+            """
 💎 TikTok Viral AI PRO
 
-• Без лимитов
+• Безлимит
+• Лучшие Hooks
+• Viral идеи
 • Быстрые ответы
-• Premium Hooks
-• Viral сценарии
-• Лучшие идеи для TikTok
 """,
-                reply_markup=pro_menu
-            )
+            reply_markup=pro_menu
+        )
 
         return
 
     # =========================
-    # CUSTOM TOPIC
+    # CUSTOM
     # =========================
 
     if current_text == "✍️ Своя тема":
@@ -411,37 +337,35 @@ async def generate(message: Message):
         waiting_custom_topic.add(user_id)
 
         await message.answer(
-            "✍️ Напиши тему для TikTok"
+            "✍️ Напиши тему"
         )
 
         return
 
     # =========================
-    # LIMITS
+    # LIMIT
     # =========================
+
+    pro_status = is_pro(user_id)
 
     if not pro_status:
 
-        if user_limits[user_id] >= FREE_LIMIT:
+        if user_limits.get(user_id, 0) >= FREE_LIMIT:
 
             await message.answer(
-                """
-❌ Бесплатные запросы закончились
-
-💎 Купи PRO для безлимита
-"""
+                "❌ Лимит закончился"
             )
 
             return
 
     # =========================
-    # SPAM PROTECTION
+    # BUSY
     # =========================
 
     if user_id in busy_users:
 
         await message.answer(
-            "⏳ Подожди завершения прошлого запроса"
+            "⏳ Подожди прошлый запрос"
         )
 
         return
@@ -449,6 +373,10 @@ async def generate(message: Message):
     busy_users[user_id] = True
 
     try:
+
+        # =========================
+        # PROMPTS
+        # =========================
 
         if current_text == "🎬 Идея ролика":
 
@@ -464,7 +392,7 @@ async def generate(message: Message):
         elif current_text == "🔥 Hook":
 
             prompt = """
-Придумай 5 мощных TikTok hooks.
+Придумай 5 TikTok hooks.
 """
 
         elif current_text == "📈 Хештеги":
@@ -481,28 +409,27 @@ async def generate(message: Message):
 Придумай вирусный TikTok сценарий:
 
 {current_text}
-
-Формат:
-🔥 HOOK
-🎬 ИДЕЯ
-📈 ХЕШТЕГИ
 """
 
         else:
-
-            if user_id in busy_users:
-                del busy_users[user_id]
-
+            del busy_users[user_id]
             return
 
-        loading = await message.answer(
+        # =========================
+        # LOADING
+        # =========================
+
+        wait = await message.answer(
             random.choice([
-                "⏳ Генерирую контент...",
-                "🔥 Анализирую TikTok...",
-                "🚀 Создаю viral идею...",
-                "📈 Подбираю hooks..."
+                "⏳ Генерирую...",
+                "🔥 Ищу тренды...",
+                "🚀 Создаю контент..."
             ])
         )
+
+        # =========================
+        # AI
+        # =========================
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -512,13 +439,12 @@ async def generate(message: Message):
                     "content": prompt
                 }
             ],
-            max_tokens=500
+            max_tokens=300
         )
 
         text = response.choices[0].message.content
 
         if not pro_status:
-
             user_limits[user_id] += 1
             save_users()
 
@@ -529,7 +455,10 @@ async def generate(message: Message):
         else:
             left_text = str(left)
 
-        final_text = f"""
+        await wait.delete()
+
+        await message.answer(
+            f"""
 ━━━━━━━━━━━━━━━
 🚀 TikTok Viral AI
 ━━━━━━━━━━━━━━━
@@ -537,17 +466,10 @@ async def generate(message: Message):
 {text}
 
 ━━━━━━━━━━━━━━━
-📊 Осталось запросов:
+📊 Осталось:
 {left_text}
-
-💎 PRO = Безлимит
 ━━━━━━━━━━━━━━━
 """
-
-        await loading.delete()
-
-        await message.answer(
-            final_text[:4000]
         )
 
     except Exception as e:
@@ -562,15 +484,14 @@ async def generate(message: Message):
             del busy_users[user_id]
 
 # =========================
-# MAIN
+# RUN
 # =========================
 
 async def main():
 
-    print("Бот запущен 🚀")
+    print("BOT STARTED")
 
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-```
